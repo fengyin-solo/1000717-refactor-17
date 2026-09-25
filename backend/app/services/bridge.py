@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.domain.bridge_profile import annotate_bridge_row
 from app.store import store
 
 MODULE = "bridge"
@@ -28,10 +29,14 @@ class BridgeService:
             rows = [row for row in rows if row.get("status") == status]
         total = len(rows)
         start = max(page - 1, 0) * size
-        return rows[start:start + size], total
+        page_rows = rows[start:start + size]
+        return [annotate_bridge_row(row) for row in page_rows], total
 
     def get_entry(self, entry_id: int) -> dict[str, Any] | None:
-        return store.find(MODULE, entry_id)
+        entry = store.find(MODULE, entry_id)
+        if entry is None:
+            return None
+        return annotate_bridge_row(entry)
 
     def create_entry(self, values: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
         missing = [field for field in REQUIRED_FIELDS if not str(values.get(field) or "").strip()]

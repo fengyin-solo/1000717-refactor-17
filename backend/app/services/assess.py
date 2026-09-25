@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.bridge_profile import BridgeProfileService, bridge_profile_service
 from app.store import store
 
 MODULE = "assess"
@@ -13,6 +14,9 @@ NEGATIVE_ACTIONS = []
 
 
 class AssessService:
+    def __init__(self, profile_service: BridgeProfileService = bridge_profile_service) -> None:
+        self.profile_service = profile_service
+
     def list_entries(
         self,
         *,
@@ -28,10 +32,12 @@ class AssessService:
             rows = [row for row in rows if row.get("status") == status]
         total = len(rows)
         start = max(page - 1, 0) * size
-        return rows[start:start + size], total
+        items = [self.profile_service.present_assessment(row) for row in rows[start:start + size]]
+        return items, total
 
     def get_entry(self, entry_id: int) -> dict[str, Any] | None:
-        return store.find(MODULE, entry_id)
+        entry = store.find(MODULE, entry_id)
+        return None if entry is None else self.profile_service.present_assessment(entry)
 
     def create_entry(self, values: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
         missing = [field for field in REQUIRED_FIELDS if not str(values.get(field) or "").strip()]
@@ -44,7 +50,7 @@ class AssessService:
         entry["pending"] = True
         entry["abnormal"] = False
         rows.append(entry)
-        return entry, []
+        return self.profile_service.present_assessment(entry), []
 
     def run_action(self, entry_id: int, action: str) -> tuple[dict[str, Any] | None, str]:
         entry = store.find(MODULE, entry_id)
@@ -58,4 +64,4 @@ class AssessService:
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
-        return entry, f"评定记录已{action}"
+        return self.profile_service.present_assessment(entry), f"评定记录已{action}"
